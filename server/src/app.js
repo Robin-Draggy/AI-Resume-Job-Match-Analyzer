@@ -1,11 +1,12 @@
-import express from 'express'
-import cors from 'cors'
+const express = require('express');
+const cors = require('cors');
+const { router } = require("./routes/resume.route");
 
-export const app = express()
+const app = express();
 
-app.use(cors())
-app.use(express.json())
+app.use(cors());
+app.use(express.json());
 
-import { router as ResumeRoutes } from "./routes/resume.route.js"
+app.use("/api/v1/resume", router);
 
-app.use("/api/v1/resume", ResumeRoutes)
+module.exports = { app };

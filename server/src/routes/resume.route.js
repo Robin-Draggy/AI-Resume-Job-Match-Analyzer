@@ -1,7 +1,9 @@
-import { Router } from "express";
-import { upload } from "../middlewares/upload.middleware.js";
-import { analyzeResume } from "../controllers/resume.controller.js";
+const { Router } = require("express");
+const { upload } = require("../middlewares/upload.middleware");
+const { analyzeResume } = require("../controllers/resume.controller");
 
-export const router = Router();
+const router = Router();
 
-router.route("/analyze").post(upload.single("resume"), analyzeResume)
+router.route("/analyze").post(upload.single("resume"), analyzeResume);
+
+module.exports = { router };
