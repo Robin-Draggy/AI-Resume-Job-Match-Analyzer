@@ -25,7 +25,8 @@ const analyzeResume = AsyncHandler(async (req, res) => {
   const aiSuggestions = await generateAISuggestions({
     resumeText,
     jobText: jobDescription,
-    analysis: result
+    matchedSkills: result.matchedSkills,
+    missingSkills: result.missingSkills,
   });
 
   return res.status(200).json(
@@ -40,26 +41,19 @@ const tailorResume = AsyncHandler(async (req, res) => {
   const file = req.file;
   const { jobDescription } = req.body;
 
-  console.log("FILE INFO:", {
-    name: req.file?.originalname,
-    size: req.file?.size,
-    mimetype: req.file?.mimetype
-  });
-
   if (!file || !jobDescription) {
     throw new ApiError(400, "Resume PDF and Job Description are required");
   }
 
-  // Extract text from the uploaded PDF
   const resumeText = await parsePDF(file.buffer);
-  
-  if (!resumeText || resumeText.length < 50) {
-    throw new ApiError(400, "Could not extract sufficient text from resume PDF");
-  }
+
+  const analysis = await analyzeMatch(resumeText, jobDescription);
 
   const result = await generateTailoredResume({
     resumeText,
-    jobText: jobDescription
+    jobText: jobDescription,
+    matchedSkills: analysis.matchedSkills,
+    missingSkills: analysis.missingSkills,
   });
 
   return res.status(200).json(
@@ -67,4 +61,57 @@ const tailorResume = AsyncHandler(async (req, res) => {
   );
 });
 
-module.exports = { analyzeResume, tailorResume };
+const compareResume = AsyncHandler(async (req, res) => {
+  const file = req.file;
+  const { jobDescription } = req.body;
+
+  if (!file || !jobDescription) {
+    throw new ApiError(400, "Resume and Job Description are required");
+  }
+
+  const resumeText = await parsePDF(file.buffer);
+
+  // 1️⃣ Analyze original
+  const originalAnalysis = await analyzeMatch(resumeText, jobDescription);
+
+  // 2️⃣ Tailor resume
+  const tailored = await generateTailoredResume({
+    resumeText,
+    jobText: jobDescription,
+    matchedSkills: originalAnalysis.matchedSkills,
+    missingSkills: originalAnalysis.missingSkills,
+  });
+
+  // Convert tailored JSON → text (important for re-analysis)
+  const tailoredText = `
+${tailored.summary}
+
+${tailored.experience
+  .map(e => `${e.title} ${e.company} ${e.dates}\n${e.achievements.join("\n")}`)
+  .join("\n")}
+
+${tailored.skills.join(", ")}
+`;
+
+  // 3️⃣ Re-analyze tailored
+  const improvedAnalysis = await analyzeMatch(tailoredText, jobDescription);
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      original: originalAnalysis,
+      tailored: {
+        resume: tailored,
+        analysis: improvedAnalysis
+      },
+      improvement: {
+        scoreIncrease:
+          improvedAnalysis.matchScore - originalAnalysis.matchScore,
+        newlyMatchedSkills: improvedAnalysis.matchedSkills.filter(
+          s => !originalAnalysis.matchedSkills.includes(s)
+        )
+      }
+    }, "Comparison generated successfully")
+  );
+});
+
+module.exports = { analyzeResume, tailorResume, compareResume };

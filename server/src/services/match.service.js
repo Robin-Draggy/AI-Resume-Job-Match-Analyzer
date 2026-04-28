@@ -1,12 +1,42 @@
 // match.service.js (CommonJS - Production Ready)
 
+const { getWeight } = require("../config/skillWeights");
+const { normalizeSkill } = require("../utils/skillMap");
+
 // ----------------------
 // STOPWORDS
 // ----------------------
 const STOPWORDS = new Set([
-  "the","is","are","a","an","and","or","we","you","they",
-  "to","of","in","for","on","with","as","by","at","from",
-  "this","that","it","be","was","were","will","can","has","have"
+  "the",
+  "is",
+  "are",
+  "a",
+  "an",
+  "and",
+  "or",
+  "we",
+  "you",
+  "they",
+  "to",
+  "of",
+  "in",
+  "for",
+  "on",
+  "with",
+  "as",
+  "by",
+  "at",
+  "from",
+  "this",
+  "that",
+  "it",
+  "be",
+  "was",
+  "were",
+  "will",
+  "can",
+  "has",
+  "have",
 ]);
 
 // ----------------------
@@ -42,7 +72,7 @@ const SKILL_KEYWORDS = {
   "rest api": ["rest api", "restful api"],
   api: ["api", "apis"],
   git: ["git"],
-  "next.js": ["nextjs", "next.js"]
+  "next.js": ["nextjs", "next.js"],
 };
 
 // ----------------------
@@ -113,97 +143,39 @@ const extractKeywords = (text) => {
 // MAIN ANALYSIS
 // ----------------------
 const analyzeMatch = (resumeText, jobText) => {
-  if (!resumeText || resumeText.length < 50) {
-    return {
-      matchScore: 0,
-      matchedSkills: [],
-      missingSkills: [],
-      suggestions: ["Invalid or unreadable resume"]
-    };
-  }
+  const resumeSkills = extractSkills(resumeText);
+  const jobSkills = extractSkills(jobText);
 
-  const resumeSkillsMap = extractSkills(resumeText);
-  const jobSkillsMap = extractSkills(jobText);
+  const resumeSkillList = Object.keys(resumeSkills);
+  const jobSkillList = Object.keys(jobSkills);
 
-  const resumeKeywords = extractKeywords(resumeText);
-  const jobKeywords = extractKeywords(jobText);
+  const normalizedResume = resumeSkillList.map(normalizeSkill);
+  const normalizedJob = jobSkillList.map(normalizeSkill);
 
-  const matchedSkills = [];
-  const missingSkills = [];
+  const matchedSkills = [...new Set(
+  normalizedJob.filter(skill => normalizedResume.includes(skill))
+)];
 
-  // ----------------------
-  // SMART CLASSIFICATION
-  // ----------------------
-  for (const skill of Object.keys(jobSkillsMap)) {
-    const data = resumeSkillsMap[skill];
+const missingSkills = [...new Set(
+  normalizedJob.filter(skill => !normalizedResume.includes(skill))
+)];
 
-    if (!data) {
-      missingSkills.push(skill);
-      continue;
+  // 👉 weighted scoring
+  let totalWeight = 0;
+  let matchedWeight = 0;
+
+  normalizedJob.forEach((skill) => {
+    const weight = getWeight(skill);
+    totalWeight += weight;
+
+    if (normalizedResume.includes(skill)) {
+      matchedWeight += weight;
     }
-
-    // HIGH CONFIDENCE
-    if (data.section > 0 || data.total >= 2) {
-      matchedSkills.push(skill);
-    }
-    // MEDIUM CONFIDENCE (still acceptable match)
-    else if (data.total === 1) {
-      matchedSkills.push(skill);
-    }
-    // otherwise ignore (no weak bucket anymore)
-  }
-
-  // ----------------------
-  // KEYWORD SCORE
-  // ----------------------
-  let keywordMatchCount = 0;
-
-  jobKeywords.forEach((word) => {
-    if (resumeKeywords.has(word)) keywordMatchCount++;
   });
 
-  const keywordScore =
-    jobKeywords.size === 0
-      ? 0
-      : (keywordMatchCount / jobKeywords.size) * 100;
-
-  // ----------------------
-  // SKILL SCORE
-  // ----------------------
-  const skillScore =
-    Object.keys(jobSkillsMap).length === 0
-      ? 0
-      : (matchedSkills.length / Object.keys(jobSkillsMap).length) * 100;
-
-  // ----------------------
-  // FINAL SCORE
-  // ----------------------
-  const matchScore = Math.round(
-    keywordScore * 0.3 + skillScore * 0.7
-  );
-
-  // ----------------------
-  // SUGGESTIONS
-  // ----------------------
-  const suggestions = [];
-
-  if (matchScore >= 80) {
-    suggestions.push("Excellent match!");
-  } else if (matchScore >= 60) {
-    suggestions.push("Good match. Fine-tune your resume.");
-  } else if (matchScore >= 40) {
-    suggestions.push("Moderate match. Improve skill alignment.");
-  } else {
-    suggestions.push("Low match. Needs optimization.");
-  }
-
-  if (missingSkills.length > 0) {
-    suggestions.push(
-      `Add relevant skills: ${missingSkills.slice(0, 5).join(", ")}`
-    );
-  }
-
-  suggestions.push("Use exact job keywords for ATS optimization.");
+  const matchScore = totalWeight === 0 
+    ? 0 
+    : Math.round((matchedWeight / totalWeight) * 100);
 
   return {
     matchScore,
@@ -211,11 +183,10 @@ const analyzeMatch = (resumeText, jobText) => {
     missingSkills,
     stats: {
       totalMatched: matchedSkills.length,
-      totalRequired: Object.keys(jobSkillsMap).length,
-      keywordOverlap: keywordMatchCount,
-      totalKeywords: jobKeywords.size
+      totalRequired: normalizedJob.length,
+      weightedMatched: matchedWeight,
+      weightedTotal: totalWeight,
     },
-    suggestions
   };
 };
 
