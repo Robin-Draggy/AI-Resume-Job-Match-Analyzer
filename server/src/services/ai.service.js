@@ -63,10 +63,15 @@ const safeParseTailoredResume = (text, fallback) => {
 // ----------------------
 // AI SUGGESTIONS
 // ----------------------
-const generateAISuggestions = async ({ resumeText, jobText, matchedSkills, missingSkills }) => {
+const generateAISuggestions = async ({
+  resumeText,
+  jobText,
+  matchedSkills,
+  missingSkills
+}) => {
   try {
     const prompt = `
-You are an expert resume reviewer and ATS optimization system.
+You are an expert resume optimizer for ALL professions (tech, medical, research, business, etc).
 
 RESUME:
 ${resumeText.slice(0, 1500)}
@@ -75,18 +80,19 @@ JOB DESCRIPTION:
 ${jobText.slice(0, 1500)}
 
 MATCH CONTEXT:
-- Matched Skills: ${matchedSkills.join(", ")}
-- Missing Skills: ${missingSkills.join(", ")}
+Matched: ${matchedSkills.join(", ")}
+Missing: ${missingSkills.join(", ")}
 
 TASKS:
-1. Give 3-5 actionable resume improvements
-2. Show how missing skills can be integrated into EXISTING bullets
-3. Rewrite 1-2 bullets with stronger impact
+1. Suggest 3-5 improvements to better align with the job
+2. Show how missing skills/keywords can be integrated into EXISTING experience
+3. Rewrite 2 bullet points with stronger impact
 
-IMPORTANT:
-- Only improve resume content
-- No external advice
-- No fake metrics
+RULES:
+- Do NOT invent fake experience
+- Adapt to ANY profession
+- Keep language natural and realistic
+- No generic advice like "improve formatting"
 
 RETURN JSON:
 {
@@ -102,20 +108,19 @@ RETURN JSON:
         { role: "system", content: "Return ONLY valid JSON." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.5,
+      temperature: 0.4,
     });
 
     const content = completion.choices?.[0]?.message?.content || "";
 
     return safeParseAISuggestions(content, {
-      improvements: ["Improve bullet clarity"],
+      improvements: ["Improve alignment with job description"],
       skillSuggestions: [],
       bulletImprovements: [],
     });
 
-  } catch (error) {
-    console.error("AI Suggestions Error:", error.message);
-
+  } catch (err) {
+    console.error(err);
     return {
       improvements: ["AI unavailable"],
       skillSuggestions: [],
@@ -127,10 +132,15 @@ RETURN JSON:
 // ----------------------
 // TAILORED RESUME
 // ----------------------
-const generateTailoredResume = async ({ resumeText, jobText, matchedSkills = [], missingSkills = [] }) => {
+const generateTailoredResume = async ({
+  resumeText,
+  jobText,
+  matchedSkills,
+  missingSkills
+}) => {
   try {
     const prompt = `
-You are a senior resume writer optimizing for ATS.
+You are a professional resume writer for ALL industries.
 
 RESUME:
 ${resumeText.slice(0, 2000)}
@@ -138,33 +148,19 @@ ${resumeText.slice(0, 2000)}
 JOB DESCRIPTION:
 ${jobText.slice(0, 2000)}
 
-MATCH CONTEXT USAGE:
-- You MUST preserve all matched skills: ${matchedSkills.join(", ")}
-- You MUST try to naturally incorporate missing skills where realistic: ${missingSkills.join(", ")}
+CONTEXT:
+Matched: ${matchedSkills.join(", ")}
+Missing: ${missingSkills.join(", ")}
+
+GOAL:
+Rewrite the resume to better match the job.
 
 RULES:
 - Do NOT invent experience
-- Use only real or strongly implied skills
-- Improve wording for ATS keywords
-- Keep it realistic
-
-OPTIMIZATION GOAL:
-- The rewritten resume MUST NOT reduce alignment with the job description
-- Preserve ALL strong matched skills (e.g., React, Redux, Tailwind)
-- Do NOT remove or weaken existing relevant technologies
-- Strengthen presence of matched skills in experience and summary
-
-PRIORITY ORDER:
-1. Preserve matched skills
-2. Improve keyword coverage
-3. Improve clarity and impact
-
-IMPORTANT:
-- Ensure important skills (React, Redux, Tailwind, etc.) appear in BOTH:
-  - skills section
-  - experience bullet points
-
-
+- Adapt language to the profession automatically
+- Improve clarity, impact, and keyword relevance
+- Integrate missing skills ONLY if realistically implied
+- Preserve strong existing skills
 
 OUTPUT JSON:
 {
@@ -187,7 +183,7 @@ OUTPUT JSON:
         { role: "system", content: "Return ONLY valid JSON." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.5,
+      temperature: 0.4,
     });
 
     const content = completion.choices?.[0]?.message?.content || "";
@@ -195,20 +191,19 @@ OUTPUT JSON:
     return {
       success: true,
       ...safeParseTailoredResume(content, {
-        summary: "Unable to generate tailored resume",
+        summary: "Failed to generate",
         experience: [],
         skills: []
       })
     };
 
-  } catch (error) {
-    console.error("Tailor Error:", error.message);
-
+  } catch (err) {
+    console.error(err);
     return {
       success: false,
-      summary: "Failed to generate resume",
+      summary: "",
       experience: [],
-      skills: [],
+      skills: []
     };
   }
 };
