@@ -5,12 +5,13 @@ import ResumeUpload from "@/components/upload/ResumeUpload";
 import JobDescriptionInput from "@/components/input/JobDescriptionInput";
 import Results from "@/components/results/Results";
 import { resumeService } from "@/services/resumeService";
+import { CompareResponse } from "@/types/compare";
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [jd, setJd] = useState('');
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<CompareResponse | null>(null);
   const [error, setError] = useState('');
 
   const handleAnalyze = async () => {
