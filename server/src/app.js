@@ -6,7 +6,6 @@ const app = express();
 
 app.use(cors({
   origin: [
-    "http://localhost:8000",
     "https://ai-resume-job-match-analyzer-rri7.vercel.app"
   ],
   credentials: true
